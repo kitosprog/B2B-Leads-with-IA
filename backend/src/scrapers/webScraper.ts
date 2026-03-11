@@ -51,14 +51,20 @@ export class WebScraper {
       const html = await page.content();
       const text = await page.evaluate(() => document.body.innerText);
 
+      console.log(`      [DEBUG] Page loaded, text length: ${text.length}, HTML length: ${html.length}`);
+
       // Extraer de texto y HTML
       let emails = extractEmails(text);
       let phones = extractPhones(text);
+      
+      console.log(`      [DEBUG] Initial extraction: ${emails.length} emails, ${phones.length} phones`);
       
       // También buscar en el HTML (mailto:, tel:, data-attributes, comentarios)
       const htmlData = extractFromHTML(html);
       emails = [...new Set([...emails, ...htmlData.emails])];
       phones = [...new Set([...phones, ...htmlData.phones])];
+      
+      console.log(`      [DEBUG] After HTML extraction: ${emails.length} emails, ${phones.length} phones`);
       
       let contactPageUrl: string | null = null;
 
@@ -164,7 +170,12 @@ export class WebScraper {
         linkedin: socialLinks.linkedin,
       };
 
-      console.log(`    ✅ Extracted: ${emails.length} emails, ${phones.length} phones`);
+      console.log(`    ✅ FINAL RESULT for ${normalizedUrl}:`);
+      console.log(`       - Name: ${companyName}`);
+      console.log(`       - Emails found: ${emails.length} → ${emails.slice(0, 3).join(', ')}`);
+      console.log(`       - Phones found: ${phones.length} → ${phones.slice(0, 3).join(', ')}`);
+      console.log(`       - Contact page: ${contactPageUrl || 'none'}`);
+      console.log(`       - LinkedIn: ${socialLinks.linkedin || 'none'}`);
 
       return result;
 
