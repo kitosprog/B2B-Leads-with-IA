@@ -16,15 +16,54 @@ export class SearchService {
   async searchCompanies(query: string, country?: string): Promise<SearchResult[]> {
     await this.scraper.init();
 
-    // Construir consulta mejorada
-    const enhancedQuery = this.buildEnhancedQuery(query, country);
+    console.log(`🔍 Starting deep search for: "${query}"`);
+
+    // Construir múltiples variaciones de consulta
+    const queries = this.buildSearchQueries(query, country);
     
-    // Intentar múltiples motores de búsqueda
-    const results = await this.performSearch(enhancedQuery);
+    const allResults: SearchResult[] = [];
+
+    // Buscar en múltiples motores y con múltiples consultas
+    for (const searchQuery of queries) {
+      try {
+        console.log(`  → Searching: "${searchQuery}"`);
+        const results = await this.performSearch(searchQuery);
+        allResults.push(...results);
+      } catch (error) {
+        console.error(`  ✗ Search failed for: "${searchQuery}"`);
+      }
+    }
+
+    // Eliminar duplicados por URL
+    const uniqueResults = this.deduplicateResults(allResults);
+    
+    console.log(`✅ Found ${uniqueResults.length} unique companies`);
     
     await this.scraper.close();
     
-    return results;
+    return uniqueResults;
+  }
+
+  private buildSearchQueries(query: string, country?: string): string[] {
+    const queries: string[] = [];
+    const location = country ? ` in ${country}` : '';
+
+    // Query principal con keywords de contacto
+    queries.push(`${query}${location} contact email phone`);
+    
+    // Query para directorios empresariales
+    queries.push(`${query}${location} business directory`);
+    
+    // Query para páginas de contacto específicas
+    queries.push(`${query}${location} "contact us" "email"`);
+    
+    // Query para LinkedIn
+    queries.push(`${query}${location} site:linkedin.com/company`);
+    
+    // Query para encontrar sitios web oficiales
+    queries.push(`${query}${location} official website`);
+
+    return queries;
   }
 
   private buildEnhancedQuery(query: string, country?: string): string {
@@ -49,23 +88,31 @@ export class SearchService {
   }
 
   private async performSearch(query: string): Promise<SearchResult[]> {
-    try {
-      // Intentar primero con Google
-      const googleResults = await this.searchGoogle(query);
-      if (googleResults.length > 0) {
-        return googleResults;
-      }
-    } catch (error) {
-      console.log('Google search failed, trying DuckDuckGo...');
+    // BÚSQUEDA EN PARALELO en múltiples motores
+    const searchPromises = [
+      this.searchGoogle(query).catch((err) => {
+        console.log('  ✗ Google failed');
+        return [];
+      }),
+      this.searchBing(query).catch((err) => {
+        console.log('  ✗ Bing failed');
+        return [];
+      }),
+      this.searchDuckDuckGo(query).catch((err) => {
+        console.log('  ✗ DuckDuckGo failed');
+        return [];
+      }),
+    ];
+
+    const allResults = await Promise.all(searchPromises);
+    
+    // Combinar todos los resultados
+    const combined: SearchResult[] = [];
+    for (const engineResults of allResults) {
+      combined.push(...engineResults);
     }
 
-    try {
-      // Fallback a DuckDuckGo
-      return await this.searchDuckDuckGo(query);
-    } catch (error) {
-      console.error('All search methods failed:', error);
-      return [];
-    }
+    return this.filterRelevantResults(combined);
   }
 
   private async searchGoogle(query: string): Promise<SearchResult[]> {
@@ -143,6 +190,57 @@ export class SearchService {
     }
   }
 
+  private async searchBing(query: string): Promise<SearchResult[]> {
+    const searchUrl = `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=20`;
+    const page = await this.scraper['browser']!.newPage();
+
+    try {
+      await page.goto(searchUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000,
+      });
+
+      await page.waitForTimeout(2000);
+
+      const results = await page.evaluate(() => {
+        const searchResults: Array<{ url: string; title: string; snippet: string }> = [];
+        const resultElements = document.querySelectorAll('li.b_algo');
+
+        resultElements.forEach(element => {
+          const titleEl = element.querySelector('h2 a');
+          const snippetEl = element.querySelector('.b_caption p');
+
+          if (titleEl) {
+            const href = titleEl.getAttribute('href');
+            const title = titleEl.textContent?.trim() || '';
+            const snippet = snippetEl?.textContent?.trim() || '';
+
+            if (href && href.startsWith('http')) {
+              try {
+                const url = new URL(href);
+                searchResults.push({
+                  url: url.origin,
+                  title,
+                  snippet,
+                });
+              } catch (e) {
+                // Ignorar URLs inválidas
+              }
+            }
+          }
+        });
+
+        return searchResults;
+      });
+
+      await page.close();
+      return results.slice(0, 15);
+    } catch (error) {
+      await page.close();
+      throw error;
+    }
+  }
+
   private async searchDuckDuckGo(query: string): Promise<SearchResult[]> {
     const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
     const page = await this.scraper['browser']!.newPage();
@@ -193,5 +291,49 @@ export class SearchService {
 
   async extractUrls(results: SearchResult[]): Promise<string[]> {
     return results.map(r => r.url);
+  }
+
+  private deduplicateResults(results: SearchResult[]): SearchResult[] {
+    const seen = new Set<string>();
+    const unique: SearchResult[] = [];
+
+    for (const result of results) {
+      // Normalizar URL para comparación
+      const normalizedUrl = result.url.toLowerCase().replace(/\/$/, '');
+      
+      if (!seen.has(normalizedUrl)) {
+        seen.add(normalizedUrl);
+        unique.push(result);
+      }
+    }
+
+    return unique;
+  }
+
+  private filterRelevantResults(results: SearchResult[]): SearchResult[] {
+    const excludeDomains = [
+      'google.com', 'youtube.com', 'facebook.com', 'twitter.com', 'x.com',
+      'instagram.com', 'wikipedia.org', 'yelp.com', 'tripadvisor',
+      'amazon.com', 'ebay.com', 'pinterest.com', 'reddit.com',
+    ];
+
+    return results.filter(result => {
+      const url = result.url.toLowerCase();
+      
+      // Excluir dominios irrelevantes
+      const isExcluded = excludeDomains.some(domain => url.includes(domain));
+      if (isExcluded) return false;
+
+      // Debe tener título
+      if (!result.title || result.title.length < 3) return false;
+
+      // Debe ser una URL válida
+      try {
+        new URL(result.url);
+        return true;
+      } catch {
+        return false;
+      }
+    });
   }
 }

@@ -1,38 +1,78 @@
-# 🔍 Búsqueda Inteligente con IA
+# 🔍 Búsqueda Profunda en Internet (Deep Search)
 
-## ✅ Cambios Implementados
+## ✅ Capacidades Implementadas
 
-He transformado el sistema de scraping para usar **búsqueda inteligente automática en internet** en lugar de URLs manuales.
+El sistema ahora realiza **búsquedas profundas en internet** para encontrar el máximo de información de contacto posible.
 
 ### Antes vs Después
 
 #### ❌ Antes
 - Usuario debía proporcionar URLs manualmente
-- Sin búsqueda automática
-- Limitado a sitios conocidos
+- Scraping solo de la página principal
+- Búsqueda en un solo motor
 
-#### ✅ Ahora
-- **Búsqueda automática** en Google y DuckDuckGo
-- **Lenguaje natural** ("restaurantes en Madrid")
-- **IA inteligente** que mejora las consultas
-- **Encuentra automáticamente** 10-15 empresas relevantes
+#### ✅ Ahora (Deep Search)
+- **Búsqueda paralela** en Google + Bing + DuckDuckGo
+- **Crawling profundo** de hasta 8 páginas por sitio web
+- **Múltiples variaciones** de consulta por búsqueda
+- **Extracción avanzada** de emails y teléfonos (incluso ofuscados)
+- **Búsqueda en HTML** (mailto:, tel:, data-attributes, comentarios)
+- **Páginas especiales** (contact, about, team, etc.)
+- **Encuentra 20-30+ empresas** por búsqueda
 
 ---
 
 ## 🚀 Nuevas Funcionalidades
 
-### 1. Servicio de Búsqueda Inteligente
+### 1. Búsqueda Multi-Motor en Paralelo
 **Archivo**: `backend/src/services/searchService.ts`
 
 Características:
-- ✅ Búsqueda en múltiples motores (Google + DuckDuckGo)
-- ✅ Mejora automática de consultas
+- ✅ **3 motores en paralelo**: Google + Bing + DuckDuckGo
+- ✅ **5+ variaciones** de consulta por búsqueda:
+  - `"query" contact email phone`
+  - `"query" business directory`
+  - `"query" "contact us" "email"`
+  - `"query" site:linkedin.com/company`
+  - `"query" official website`
 - ✅ Filtrado inteligente de resultados
-- ✅ Extracción de títulos y snippets
-- ✅ Eliminación de duplicados
-- ✅ Fallback automático si falla un motor
+- ✅ Deduplicación automática
+- ✅ Fallback resiliente
 
-### 2. Prompt Inteligente
+### 2. Crawling Profundo de Sitios Web
+**Archivo**: `backend/src/scrapers/webScraper.ts`
+
+Características:
+- ✅ **Explora hasta 8 páginas por sitio**:
+  - `/contact`, `/contacto`, `/contact-us`
+  - `/about`, `/about-us`, `/sobre`
+  - `/team`, `/equipo`, `/our-team`
+  - `/empresa`, `/nosotros`
+  - Páginas descubiertas automáticamente
+- ✅ Extracción en cada página visitada
+- ✅ Para cuando encuentra suficientes datos
+- ✅ Logging detallado del progreso
+
+### 3. Extracción Avanzada de Contactos
+**Archivo**: `backend/src/utils/extractors.ts`
+
+Características:
+- ✅ **Emails** (incluso ofuscados):
+  - `email@domain.com`
+  - `email [at] domain [dot] com`
+  - `email @ domain . com`
+- ✅ **Teléfonos** (múltiples formatos):
+  - `+34 912 345 678`
+  - `(+34) 912 345 678`
+  - `912-345-678`
+  - `Tel: 912345678`
+- ✅ **Búsqueda en HTML**:
+  - Links `mailto:` y `tel:`
+  - Data attributes
+  - Comentarios HTML
+- ✅ Validación y normalización
+
+### 4. Prompt Inteligente
 **Archivo**: `frontend/app/page.tsx`
 
 Mejoras:
@@ -40,15 +80,25 @@ Mejoras:
 - ✅ Ejemplos visuales por categoría
 - ✅ Explicación del proceso paso a paso
 - ✅ Input más grande y claro
-- ✅ Indicadores visuales de "Auto Search"
+- ✅ **Indicador de "Deep Search Mode"**
+- ✅ Explicación de las capacidades avanzadas
 
-### 3. Componente de Ejemplos
+### 5. Componente de Ejemplos
 **Archivo**: `frontend/components/SearchExamples.tsx`
 
 Muestra ejemplos organizados por:
 - Por industria (software, marketing, etc.)
 - Por servicio (consultoría, diseño, etc.)
 - Por mercado (SaaS, e-commerce, etc.)
+
+### 6. Servicio de Directorios (Preparado para futuro)
+**Archivo**: `backend/src/services/directoryService.ts`
+
+Framework para búsqueda en:
+- Directorios empresariales por país
+- LinkedIn Companies
+- Google Business
+- (Implementación completa requiere APIs/autenticación)
 
 ---
 
@@ -61,19 +111,45 @@ Muestra ejemplos organizados por:
    ↓
    "software companies in Barcelona"
    
-2. Sistema mejora la consulta
+2. Sistema genera 5+ variaciones de consulta
    ↓
-   "software companies in Barcelona empresas sitio web contacto"
+   - "software companies in Barcelona contact email phone"
+   - "software companies in Barcelona business directory"
+   - "software companies in Barcelona site:linkedin.com"
+   - etc.
    
-3. Búsqueda en Google/DuckDuckGo
+3. Búsqueda PARALELA en 3 motores
    ↓
-   Encuentra 10-15 URLs relevantes
+   Google + Bing + DuckDuckGo simultáneamente
    
-4. Scraping automático
+4. Encuentra 20-30+ URLs relevantes
    ↓
-   Extrae emails, teléfonos, datos
+   Deduplicación y filtrado
    
-5. Resultados en dashboard
+5. Scraping PROFUNDO de cada sitio
+   ↓
+   - Página principal
+   - Página de contacto
+   - Página about
+   - Página team
+   - Otros (hasta 8 páginas)
+   
+6. Extracción AVANZADA
+   ↓
+   - Emails en texto y HTML
+   - Teléfonos en múltiples formatos
+   - Emails ofuscados
+   - Links mailto: y tel:
+   - Data attributes
+   - Comentarios HTML
+   
+7. Validación y normalización
+   ↓
+   - Valida emails corporativos
+   - Normaliza teléfonos
+   - Elimina duplicados
+   
+8. Resultados en dashboard
    ↓
    Listo para exportar
 ```
@@ -230,25 +306,52 @@ Puedes extender `SearchService` para agregar:
 
 ---
 
-## 🔮 Futuras Mejoras Posibles
+## 🔮 Mejoras Adicionales Posibles
 
-- [ ] Integración con Google Custom Search API (para búsquedas ilimitadas)
+- [ ] Integración con APIs comerciales de búsqueda (ilimitadas)
+- [ ] Scraping autenticado de LinkedIn
+- [ ] Búsqueda en directorios empresariales especializados
+- [ ] Extracción de redes sociales (Twitter, Facebook)
 - [ ] Caché de búsquedas frecuentes
-- [ ] Sugerencias automáticas mientras escribes
-- [ ] Búsqueda por categoría predefinida
-- [ ] Filtros avanzados (tamaño de empresa, año de fundación, etc.)
-- [ ] Búsqueda en redes sociales (LinkedIn, etc.)
+- [ ] Búsqueda por categoría/industria predefinida
+- [ ] Filtros avanzados (tamaño, fundación, etc.)
+- [ ] Extracción de direcciones físicas
+- [ ] Identificación de personas clave (CEO, CTO)
+- [ ] Análisis de competencia
 
 ---
 
 ## ✅ Resultado Final
 
-Ahora tienes un **sistema de búsqueda inteligente** que:
+Ahora tienes un **sistema de búsqueda profunda (Deep Search)** que:
 
 1. ✅ Acepta lenguaje natural
-2. ✅ Busca automáticamente en internet
-3. ✅ Encuentra empresas relevantes
-4. ✅ Scrapea datos de contacto
-5. ✅ Presenta resultados listos para usar
+2. ✅ Busca en **3 motores en paralelo** (Google + Bing + DuckDuckGo)
+3. ✅ Genera **múltiples variaciones** de consulta
+4. ✅ **Explora hasta 8 páginas** por cada sitio web
+5. ✅ **Extrae emails y teléfonos** incluso ofuscados
+6. ✅ Busca en **HTML, atributos y comentarios**
+7. ✅ **Valida y normaliza** todos los datos
+8. ✅ Presenta resultados completos y listos para usar
 
-**¡El usuario solo necesita describir lo que busca y el sistema hace todo el trabajo!** 🚀
+**¡El sistema encuentra TODA la información de contacto disponible públicamente!** 🚀
+
+## 🎯 Ventajas Clave
+
+### Cobertura Máxima
+✅ **Múltiples motores**: No depende de un solo buscador
+✅ **Crawling profundo**: No se queda solo en la homepage
+✅ **Patrones avanzados**: Encuentra emails/teléfonos ofuscados
+✅ **Búsqueda exhaustiva**: Explora contact, about, team, etc.
+
+### Datos de Calidad
+✅ **Validación estricta**: Solo emails corporativos
+✅ **Normalización**: Teléfonos en formato internacional
+✅ **Sin duplicados**: Deduplicación inteligente
+✅ **Prioridad**: Calidad sobre cantidad
+
+### Experiencia de Usuario
+✅ **Simple**: Solo describe lo que buscas
+✅ **Rápido**: Búsquedas paralelas
+✅ **Completo**: Máxima información posible
+✅ **Transparente**: Logs detallados del progreso

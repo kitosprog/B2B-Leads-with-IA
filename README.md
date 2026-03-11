@@ -4,8 +4,11 @@ A professional-grade SaaS application for B2B lead generation through intelligen
 
 ## 🚀 Features
 
+- 🔍 **Deep Search Mode** - Multi-engine parallel search (Google + Bing + DuckDuckGo)
+- 🕷️ **Deep Crawling** - Explores up to 8 pages per website (contact, about, team, etc.)
+- 📧 **Advanced Extraction** - Finds emails and phones even when obfuscated
+- 🌐 **Multi-Source Search** - Searches in text, HTML, mailto:, tel:, data-attributes, and HTML comments
 - ✨ **Clean, Professional UI** - Minimalist design inspired by Stripe and Linear
-- 🔍 **Intelligent Scraping** - Playwright-powered web scraping with fallback strategies
 - 📊 **Real-time Job Tracking** - Monitor scraping progress in real-time
 - 💾 **PostgreSQL Database** - Reliable data persistence with indexes
 - 🚦 **Background Jobs** - BullMQ for scalable job processing

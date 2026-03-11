@@ -110,6 +110,16 @@ export default function DashboardPage() {
                   disabled={isSubmitting}
                   className="h-12 text-base"
                 />
+                <div className="flex items-start gap-2 mt-2 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                  <div className="mt-0.5">
+                    <svg className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div className="text-xs text-indigo-700">
+                    <strong>Deep Search Mode:</strong> We search Google + Bing + DuckDuckGo in parallel, explore company websites deeply (contact pages, about pages, team pages), and extract all available emails and phones.
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <button
                     type="button"

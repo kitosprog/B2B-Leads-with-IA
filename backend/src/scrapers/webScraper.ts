@@ -1,6 +1,6 @@
 import { chromium, Browser, Page } from 'playwright';
 import { config } from '../config';
-import { extractEmails, extractPhones, extractCompanyName, findContactPages } from '../utils/extractors';
+import { extractEmails, extractPhones, extractCompanyName, findContactPages, extractFromHTML } from '../utils/extractors';
 import { normalizeUrl } from '../utils/validators';
 
 export interface ScrapedData {
@@ -41,6 +41,8 @@ export class WebScraper {
       page = await this.browser!.newPage();
       await page.setUserAgent(config.scraping.userAgent);
 
+      console.log(`    🔍 Deep scraping: ${normalizedUrl}`);
+
       await page.goto(normalizedUrl, {
         waitUntil: 'domcontentloaded',
         timeout: config.scraping.timeout,
@@ -49,55 +51,125 @@ export class WebScraper {
       const html = await page.content();
       const text = await page.evaluate(() => document.body.innerText);
 
+      // Extraer de texto y HTML
       let emails = extractEmails(text);
       let phones = extractPhones(text);
+      
+      // También buscar en el HTML (mailto:, tel:, data-attributes, comentarios)
+      const htmlData = extractFromHTML(html);
+      emails = [...new Set([...emails, ...htmlData.emails])];
+      phones = [...new Set([...phones, ...htmlData.phones])];
+      
+      let contactPageUrl: string | null = null;
 
-      if (emails.length === 0 || phones.length === 0) {
-        const contactPages = findContactPages(html, normalizedUrl);
+      // BÚSQUEDA PROFUNDA: Explorar múltiples páginas
+      const pagesToExplore = [
+        { path: '/contact', name: 'Contact' },
+        { path: '/contacto', name: 'Contacto' },
+        { path: '/contact-us', name: 'Contact Us' },
+        { path: '/about', name: 'About' },
+        { path: '/about-us', name: 'About Us' },
+        { path: '/team', name: 'Team' },
+        { path: '/equipo', name: 'Equipo' },
+        { path: '/empresa', name: 'Empresa' },
+        { path: '/nosotros', name: 'Nosotros' },
+      ];
+
+      // Primero, buscar links en la página actual
+      const discoveredPages = await page.evaluate(() => {
+        const links = Array.from(document.querySelectorAll('a[href]'));
+        const contactKeywords = ['contact', 'contacto', 'about', 'sobre', 'team', 'equipo', 'nosotros'];
         
-        for (const contactUrl of contactPages) {
-          try {
-            await page.goto(contactUrl, { 
-              waitUntil: 'domcontentloaded',
-              timeout: 10000 
-            });
-            const contactText = await page.evaluate(() => document.body.innerText);
-            
-            if (emails.length === 0) {
-              emails = extractEmails(contactText);
-            }
-            if (phones.length === 0) {
-              phones = extractPhones(contactText);
-            }
-            
-            if (emails.length > 0 && phones.length > 0) {
-              break;
-            }
-          } catch (error) {
-            continue;
+        return links
+          .map(a => a.getAttribute('href'))
+          .filter(href => href && contactKeywords.some(kw => href.toLowerCase().includes(kw)))
+          .slice(0, 5);
+      });
+
+      // Combinar páginas descubiertas con rutas comunes
+      const allPagesToTry = [
+        ...discoveredPages.map(p => p),
+        ...pagesToExplore.map(p => p.path),
+      ];
+
+      // Explorar cada página para encontrar más contactos
+      for (const pagePath of allPagesToTry.slice(0, 8)) {
+        // Limitar a 8 páginas por sitio
+        try {
+          const fullUrl = new URL(pagePath, normalizedUrl).href;
+          
+          // Evitar duplicados
+          if (fullUrl === normalizedUrl) continue;
+
+          console.log(`      → Exploring: ${fullUrl}`);
+          
+          await page.goto(fullUrl, { 
+            waitUntil: 'domcontentloaded',
+            timeout: 15000 
+          });
+
+          const pageText = await page.evaluate(() => document.body.innerText);
+          
+          // Extraer más emails y teléfonos
+          const newEmails = extractEmails(pageText);
+          const newPhones = extractPhones(pageText);
+          
+          if (newEmails.length > 0) {
+            emails = [...new Set([...emails, ...newEmails])];
+            console.log(`        ✓ Found ${newEmails.length} more emails`);
           }
+          
+          if (newPhones.length > 0) {
+            phones = [...new Set([...phones, ...newPhones])];
+            console.log(`        ✓ Found ${newPhones.length} more phones`);
+          }
+
+          // Guardar la página de contacto si encontramos datos aquí
+          if (!contactPageUrl && (newEmails.length > 0 || newPhones.length > 0)) {
+            contactPageUrl = fullUrl;
+          }
+
+          // Si ya tenemos buenos datos, podemos parar
+          if (emails.length >= 3 && phones.length >= 2) {
+            break;
+          }
+
+        } catch (error) {
+          // Continuar con la siguiente página
+          continue;
         }
       }
 
-      const linkedinLink = await page.evaluate(() => {
-        const link = Array.from(document.querySelectorAll('a'))
-          .find(a => a.href.includes('linkedin.com'));
-        return link?.href || null;
+      // Buscar LinkedIn y otras redes sociales
+      await page.goto(normalizedUrl, { waitUntil: 'domcontentloaded' });
+      
+      const socialLinks = await page.evaluate(() => {
+        const links = Array.from(document.querySelectorAll('a[href]'));
+        
+        return {
+          linkedin: links.find(a => a.href.includes('linkedin.com/company'))?.href || null,
+          facebook: links.find(a => a.href.includes('facebook.com'))?.href || null,
+          twitter: links.find(a => a.href.includes('twitter.com') || a.href.includes('x.com'))?.href || null,
+        };
       });
 
       const companyName = extractCompanyName(html);
 
-      return {
+      const result = {
         name: companyName,
         website: normalizedUrl,
         email: emails[0] || null,
         phone: phones[0] || null,
-        contact_page: null,
-        linkedin: linkedinLink,
+        contact_page: contactPageUrl,
+        linkedin: socialLinks.linkedin,
       };
 
+      console.log(`    ✅ Extracted: ${emails.length} emails, ${phones.length} phones`);
+
+      return result;
+
     } catch (error) {
-      console.error(`Error scraping ${url}:`, error);
+      console.error(`    ✗ Error scraping ${url}:`, error);
       return null;
     } finally {
       if (page) {
